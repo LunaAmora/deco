@@ -1,0 +1,14 @@
+[package]
+authors = ["Luna Amora <luna.mberry@gmail.com>"]
+name = "decorators"
+version = "0.1.0"
+edition = "2021"
+readme = "README.md"
+license-file = "LICENSE"
+
+[dependencies]
+deco_derive = { version = "0.1.0", path = "deco_derive", optional = true}
+
+[features]
+default = ["derive"]
+derive = ["deco_derive"]
