@@ -3,41 +3,33 @@ pub use deco_derive::deco;
 
 #[macro_export]
 macro_rules! make_decorator {
-    ($pub:vis fn $fun:ident <$arg_ty:ident>($function:ident : $typ:ty, $args:ident: $arg_ty2:ident) $body:block) => {
-        $pub fn $fun<F, $arg_ty, R>($function: F) -> impl Fn($arg_ty2) -> R
+    ($pub:vis fn $fun:ident $(<$($gen:tt $(: $bnd:tt)?),*>)? ($f:ident : $typ:ident $(, $arg:ident: $arg_ty:ty)?) -> $ret:ty $body:block) => {
+        $pub fn $fun <$($($gen: $($bnd)?),*,)? $typ> ($f: $typ) -> impl Fn($($arg_ty)?) -> $ret
         where
-            F: Fn($arg_ty2) -> R,
+            $typ: Fn($($arg_ty)?) -> $ret,
         {
-            move |$args| $body
+            move |$($arg)?| $body
         }
     };
 
-    ($pub:vis fn $fun:ident ($function:ident: $typ:ty, $args:ident: $arg_ty:ty) $body:block) => {
-        $pub fn $fun<F, R>($function: F) -> impl Fn($arg_ty) -> R
+    ($pub:vis fn $fun:ident $(<$($gen:tt $(: $bnd:tt)?),*>)? ($f:ident : $typ:ident $(, ($($arg:pat),*) : $arg_ty:ty)?) -> $ret:ty $body:block) => {
+        #[allow(unused_parens)]
+        $pub fn $fun <$($($gen: $($bnd)?),*,)? $typ> ($f: $typ) -> impl Fn($($arg_ty)?) -> $ret
         where
-            F: Fn($arg_ty) -> R,
+            $typ: Fn($($arg_ty)?) -> $ret,
         {
-            move |$args| $body
-        }
-    };
-
-    ($pub:vis fn $fun:ident ($function:ident: $typ:ty) $body:block) => {
-        $pub fn $fun<F, R>($function: F) -> impl Fn() -> R
-        where
-            F: Fn() -> R,
-        {
-            move || $body
+            move |$(($($arg),*))?| $body
         }
     };
 }
 
 #[macro_export]
 macro_rules! decorator {
-    (@ $deco:ident $mangled:ident $pub:vis fn $fun:ident ( $($name:ident : $typ:ty),* ) $( -> $ret:ty )? $body:block) => {
+    (@ $deco:ident $mangled:ident $pub:vis fn $fun:ident $(<$($gen:tt $(: $bnd:tt)?),*>)? ( $($name:ident : $typ:ty),* ) $( -> $ret:ident )? $body:block) => {
         #[allow(unused_parens)]
-        $pub fn $mangled (($($name),*) : ($($typ),*)) $( -> $ret )? $body
+        $pub fn $mangled $(<$($gen: $($bnd)?),*,>)?(($($name),*) : ($($typ),*)) $( -> $ret )? $body
 
-        $pub fn $fun ($($name : $typ),*) $( -> $ret )? {
+        $pub fn $fun $(<$($gen: $($bnd)?),*,>)? ($($name : $typ),*) $( -> $ret )? {
             $deco($mangled)(($($name),*))
         }
     };
@@ -46,6 +38,7 @@ macro_rules! decorator {
 #[cfg(test)]
 mod tests {
     use core::time::Duration;
+    use std::fmt::Display;
     use std::thread::sleep;
     use std::time::Instant;
 
@@ -54,7 +47,7 @@ mod tests {
 
     //Non-generic decorator, can inspect/modify args
     #[deco]
-    fn timer(fun: Function, args: (u64, &str)) {
+    fn timer<R, D: Display>(fun: Function, args: (u64, D)) -> R {
         let start_time = Instant::now();
         let r = fun(args);
         let run_time = Instant::now() - start_time;
@@ -63,7 +56,7 @@ mod tests {
     }
 
     #[deco(timer)]
-    fn do_work(work_time: u64, payload: &str) -> bool {
+    fn do_work<D: Display>(work_time: u64, payload: D) -> bool {
         sleep(Duration::new(work_time, 0));
         println!("Work done: {}", payload);
         true
@@ -77,7 +70,7 @@ mod tests {
 
         //Generic decorator, cannot inspect/modify args
         #[deco]
-        fn do_stuff<A>(f: F, args: A) {
+        fn do_stuff<A, R>(f: F, args: A) -> R {
             println!("doing stuff!");
             f(args)
         }
@@ -89,7 +82,7 @@ mod tests {
 
         //Decorator without any arguments to pass
         #[deco]
-        fn argless_decorator(f: F) {
+        fn argless_decorator<R>(f: F) -> R {
             println!("Doing argless work!");
             f()
         }
